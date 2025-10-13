@@ -1,11 +1,11 @@
 [submodule "third_party/libbpf"]
-    path = third_party/libbpf
-    url = https://github.com/libbpf/libbpf.git
+	path = third_party/libbpf
+	url = https://github.com/libbpf/libbpf.git
 
 [submodule "third_party/bpftool"]
-    path = third_party/bpftool
-    url = https://github.com/libbpf/bpftool.git
+	path = third_party/bpftool
+	url = https://github.com/libbpf/bpftool.git
 
 [submodule "third_party/cjson"]
-    path = third_party/cjson
-    url = https://github.com/DaveGamble/cJSON.git
+	path = third_party/cjson
+	url = https://github.com/DaveGamble/cJSON.git

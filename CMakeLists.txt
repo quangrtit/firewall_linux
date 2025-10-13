@@ -71,9 +71,12 @@ elseif(${CMAKE_SYSTEM_PROCESSOR} MATCHES "loongarch64")
   set(ARCH "loongarch")
 endif()
 
-add_subdirectory(cjson)
+add_subdirectory(third_party/cjson)
 set(BPFOBJECT_BPFTOOL_EXE ${CMAKE_CURRENT_BINARY_DIR}/bpftool/bootstrap/bpftool)
+# set(LIBBPF_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/libbpf)
 set(LIBBPF_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR}/libbpf)
+include_directories(${LIBBPF_INCLUDE_DIRS}/bpf)
+
 set(LIBBPF_LIBRARIES ${CMAKE_CURRENT_BINARY_DIR}/libbpf/libbpf.a)
 find_package(BpfObject REQUIRED)
 
@@ -114,7 +117,7 @@ target_link_libraries(${MAIN_EXECUTABLE_NAME} PRIVATE
     -lpthread     
     -lrt          
     -ldl 
-    cjson cjson 
+    cjson 
     OpenSSL::SSL
     OpenSSL::Crypto
     Boost::system
@@ -130,7 +133,8 @@ endforeach()
 target_include_directories(${MAIN_EXECUTABLE_NAME} PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR} 
     ${CMAKE_CURRENT_BINARY_DIR}/libbpf/bpf
-    ${CMAKE_SOURCE_DIR}/cjson
+    ${CMAKE_CURRENT_BINARY_DIR}/libbpf
+    ${CMAKE_SOURCE_DIR}/third_party
 )
 # Add dependencies for the main executable to ensure BPF objects are built first
 add_dependencies(${MAIN_EXECUTABLE_NAME} libbpf-build bpftool-build)
@@ -139,10 +143,10 @@ foreach(app_item ${apps})
     add_dependencies(${MAIN_EXECUTABLE_NAME} ${app_stem_item}_skel)
 endforeach()
 
-set(DEFAULT_POLICY_FILE_PATH "/var/lib/firewal_linux/self_defense_policy.json" CACHE STRING "Default path to self defense policy JSON file")
+set(DEFAULT_POLICY_FILE_PATH "/var/lib/firewal_linux/firewall_configs.json" CACHE STRING "Default path to self defense policy JSON file")
 target_compile_definitions(firewal_linux PRIVATE DEFAULT_POLICY_FILE_PATH=\"${DEFAULT_POLICY_FILE_PATH}\")
-configure_file("${CMAKE_SOURCE_DIR}/configs/self_defense_policy.json"
-               "${CMAKE_BINARY_DIR}/self_defense_policy.json"
+configure_file("${CMAKE_SOURCE_DIR}/configs/firewall_configs.json"
+               "${CMAKE_BINARY_DIR}/firewall_configs.json"
                COPYONLY)
 
 # --- CPack Configuration --
