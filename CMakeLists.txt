@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(SentinelEDR LANGUAGES C CXX)
+project(firewal_linux LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -99,7 +99,7 @@ foreach(app ${apps})
   bpf_object(${app_stem} ${app_rel})
   add_dependencies(${app_stem}_skel libbpf-build bpftool-build)
 
-  # For SentinelEDR, we will use the name defined by CMAKE_PROJECT_NAME
+  # For firewal_linux, we will use the name defined by CMAKE_PROJECT_NAME
   # This part of the loop focuses on building BPF objects and their skeletons.
   # The main executable will be defined outside this loop and link to these skeletons.
 endforeach()
@@ -139,8 +139,8 @@ foreach(app_item ${apps})
     add_dependencies(${MAIN_EXECUTABLE_NAME} ${app_stem_item}_skel)
 endforeach()
 
-set(DEFAULT_POLICY_FILE_PATH "/var/lib/SentinelEDR/self_defense_policy.json" CACHE STRING "Default path to self defense policy JSON file")
-target_compile_definitions(SentinelEDR PRIVATE DEFAULT_POLICY_FILE_PATH=\"${DEFAULT_POLICY_FILE_PATH}\")
+set(DEFAULT_POLICY_FILE_PATH "/var/lib/firewal_linux/self_defense_policy.json" CACHE STRING "Default path to self defense policy JSON file")
+target_compile_definitions(firewal_linux PRIVATE DEFAULT_POLICY_FILE_PATH=\"${DEFAULT_POLICY_FILE_PATH}\")
 configure_file("${CMAKE_SOURCE_DIR}/configs/self_defense_policy.json"
                "${CMAKE_BINARY_DIR}/self_defense_policy.json"
                COPYONLY)
