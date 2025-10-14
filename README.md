@@ -35,4 +35,4 @@ This project implements a custom packet filtering and firewall system using **eB
    ```bash
    git clone https://github.com/quangrtit/firewall_linux
    cd firewall_linux
-   cmake .. && make 
+   cmake .. && make && sudo ./firewall_linux
