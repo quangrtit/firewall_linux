@@ -1,5 +1,8 @@
 #include "utils.h"
-
+#include <sys/sysmacros.h>
+#include <errno.h>
+#include <unistd.h> 
+#include <sys/stat.h>
 
 
 // Convert "TCP", "UDP", "ICMP" to corresponding numeric codes
@@ -31,28 +34,28 @@ static void parse_ip_lpm(const char *ip_str, struct ip_lpm_key *key, __u8 *ip_ve
         inet_pton(AF_INET, ip_str, key->data);
     }
 }
-bool load_firewall_rules_into_map(int map_fd, const char *json_path) {
-    FILE *f = fopen(json_path, "r");
-    if (!f) {
-        perror("fopen json");
-        return false;
+int load_firewall_rules_into_map(struct firewall_bpf *skel, int map_fd, const char *json_path) {
+    FILE *fp = fopen(json_path, "r");
+    if (fp == NULL) {
+        fprintf(stderr, "[user space policy_manager.cpp] Error: Could not open policy file '%s': %s\n", json_path, strerror(errno));
+        return -1;
     }
 
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    rewind(f);
-
-    char *buffer = calloc(1, size + 1);
-    fread(buffer, 1, size, f);
-    fclose(f);
-
-    cJSON *root = cJSON_Parse(buffer);
-    free(buffer);
-
-    if (!root || !cJSON_IsArray(root)) {
-        fprintf(stderr, "Invalid JSON rule file!\n");
-        cJSON_Delete(root);
-        return false;
+    fseek(fp, 0, SEEK_END);
+    long fsize = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    char *json_string = (char*)malloc(fsize + 1);
+    fread(json_string, 1, fsize, fp);
+    fclose(fp);
+    json_string[fsize] = '\0';
+    cJSON *root = cJSON_Parse(json_string);
+    if (root == NULL) {
+        const char *error_ptr = cJSON_GetErrorPtr();
+        if (error_ptr != NULL) {
+            fprintf(stderr, "[user space policy_manager.cpp] Error parsing JSON: %s\n", error_ptr);
+        }
+        free(json_string);
+        return -1;
     }
 
     int rule_count = cJSON_GetArraySize(root);
@@ -77,18 +80,23 @@ bool load_firewall_rules_into_map(int map_fd, const char *json_path) {
         key.dst_port = (strcmp(dst_port, "any") == 0) ? 0 : (__u16)atoi(dst_port);
         key.protocol = parse_protocol(proto);
         verdict = (strcasecmp(action, "DENY") == 0) ? DENY : ALLOW;
-
-        if (bpf_map_update_elem(map_fd, &key, &verdict, BPF_ANY) != 0) {
-            perror("bpf_map_update_elem");
-            fprintf(stderr, "❌ Failed rule %d: %s -> %s\n", i, src_ip, dst_ip);
-        } else {
-            printf("✅ Loaded rule %d: %s:%s -> %s:%s (%s) = %s\n",
+        printf("Loaded rule %d: %s:%s -> %s:%s (%s) = %s\n",
                    i, src_ip, src_port, dst_ip, dst_port, proto, action);
+        if (bpf_map__update_elem(
+                skel->maps.rules_map,
+                &key, sizeof(key),
+                &verdict, sizeof(verdict),
+                BPF_ANY) != 0) {
+            perror("bpf_map__update_elem false\n");
+        }
+        else {
+            // printf("Loaded rule %d: %s:%s -> %s:%s (%s) = %s\n",
+            //        i, src_ip, src_port, dst_ip, dst_port, proto, action);
         }
     }
 
     cJSON_Delete(root);
-    return true;
+    return 0;
 }
 // Check interface IPv4
 int has_default_route4(const char *ifname) {

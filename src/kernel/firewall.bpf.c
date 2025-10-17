@@ -14,13 +14,21 @@ struct {
     __uint(max_entries, 1 << 24);
 } firewall_events SEC(".maps");
 
+
 struct {
-    __uint(type, BPF_MAP_TYPE_LPM_TRIE);
+
+    __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 1024);
     __type(key, struct rule_key);
     __type(value, enum ip_status);
-    __uint(map_flags, BPF_F_NO_PREALLOC);
 } rules_map SEC(".maps");
+// struct {
+//     __uint(type, BPF_MAP_TYPE_LPM_TRIE);
+//     __uint(max_entries, 1024);
+//     __type(key, struct rule_key);
+//     __type(value, enum ip_status);
+//     __uint(map_flags, BPF_F_NO_PREALLOC);
+// } rules_map SEC(".maps");
 
 // static function
 static __always_inline void send_event(enum firewall_event_type type, void *data) {
@@ -103,7 +111,7 @@ int xdp_block(struct xdp_md *ctx)
         __builtin_memcpy(lpm_key.data, &ip_be, 4);
 
         np.family   = AF_INET;
-        np.daddr_v4 = ip4->saddr;   
+        np.saddr_v4 = ip4->saddr;   
 
         np.protocol = ip4->protocol;
 
@@ -121,23 +129,23 @@ int xdp_block(struct xdp_md *ctx)
                         ip4->ihl,
                         bpf_ntohs(ip4->tot_len));
             np.src_port = bpf_ntohs(th->source);
-            np.dport    = bpf_ntohs(th->dest);
+            // np.dport    = bpf_ntohs(th->dest);
         } else if (ip4->protocol == IPPROTO_UDP) {
             struct udphdr *uh = l4;
             if ((void *)(uh + 1) > data_end)
                 return XDP_PASS;
             np.src_port = bpf_ntohs(uh->source);
-            np.dport    = bpf_ntohs(uh->dest);
+            // np.dport    = bpf_ntohs(uh->dest);
         }
 
         full_key.ip_version = 4;
         __builtin_memcpy(&full_key.src.data, &ip4->saddr, 4);
         full_key.src.prefixlen = 32;
-        __builtin_memcpy(&full_key.dst.data, &ip4->daddr, 4);
-        full_key.dst.prefixlen = 32;
+        // __builtin_memcpy(&full_key.dst.data, &ip4->daddr, 4);
+        // full_key.dst.prefixlen = 32;
         full_key.protocol = ip4->protocol;
         full_key.src_port = np.src_port;
-        full_key.dst_port = np.dport;
+        // full_key.dst_port = np.dport;
         
     }
 
@@ -150,7 +158,7 @@ int xdp_block(struct xdp_md *ctx)
         lpm_key.prefixlen = 128;
         __builtin_memcpy(lpm_key.data, &ip6->saddr, 16);
         np.family   = AF_INET6;
-        __builtin_memcpy(np.daddr_v6, &ip6->saddr, 16);
+        __builtin_memcpy(np.saddr_v6, &ip6->saddr, 16);
         np.protocol = ip6->nexthdr;
 
         void *l4 = (void *)(ip6 + 1);
@@ -162,23 +170,23 @@ int xdp_block(struct xdp_md *ctx)
             if ((void *)(th + 1) > data_end)
                 return XDP_PASS;
             np.src_port = bpf_ntohs(th->source);
-            np.dport    = bpf_ntohs(th->dest);
+            // np.dport    = bpf_ntohs(th->dest);
         } else if (ip6->nexthdr == IPPROTO_UDP) {
             struct udphdr *uh = l4;
             if ((void *)(uh + 1) > data_end)
                 return XDP_PASS;
             np.src_port = bpf_ntohs(uh->source);
-            np.dport    = bpf_ntohs(uh->dest);
+            // np.dport    = bpf_ntohs(uh->dest);
         }
 
         full_key.ip_version = 6;
         __builtin_memcpy(&full_key.src.data, &ip6->saddr, 16);
         full_key.src.prefixlen = 128;
-        __builtin_memcpy(&full_key.dst.data, &ip6->daddr, 16);
-        full_key.dst.prefixlen = 128;
+        // __builtin_memcpy(&full_key.dst.data, &ip6->daddr, 16);
+        // full_key.dst.prefixlen = 128;
         full_key.protocol = ip6->nexthdr;
         full_key.src_port = np.src_port;
-        full_key.dst_port = np.dport;
+        // full_key.dst_port = np.dport;
     }
 
     /* -------------------- Non-IP -------------------- */

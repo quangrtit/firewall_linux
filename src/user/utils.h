@@ -6,7 +6,7 @@ extern "C" {
     #include "firewall.skel.h"
 }
 
-bool load_firewall_rules_into_map(int map_fd, const char *json_path);
+int load_firewall_rules_into_map(struct firewall_bpf *skel, int map_fd, const char *json_path);
 
 int has_default_route4(const char *ifname);
 

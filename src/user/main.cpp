@@ -23,21 +23,21 @@ static int handle_firewall_event(void *ctx, void *data, size_t data_sz) {
 
     // Firewall event type
     const char *type_str = "UNKNOWN";
-    if (evt->type == FIREWALL_EVT_BLOCKED_IP) type_str = "NET";
-    else if (evt->type == FIREWALL_EVT_CONNECT_IP) type_str = "NET";
+    if (evt->type == FIREWALL_EVT_BLOCKED_IP) type_str = "NET_BLOCKED";
+    else if (evt->type == FIREWALL_EVT_CONNECT_IP) type_str = "NET_CONNECTED";
   
     // use std::cerr all
     switch (evt->type) {
-        case FIREWALL_EVT_CONNECT_IP:
+        case FIREWALL_EVT_BLOCKED_IP:
             char ip_str[INET6_ADDRSTRLEN];
             if (evt->net.family == AF_INET) {
                 // IPv4
                 struct in_addr addr4;
-                addr4.s_addr = evt->net.daddr_v4;
+                addr4.s_addr = evt->net.saddr_v4;
                 inet_ntop(AF_INET, &addr4, ip_str, sizeof(ip_str));
             } else if (evt->net.family == AF_INET6) {
                 struct in6_addr addr6;
-                memcpy(&addr6, evt->net.daddr_v6, sizeof(addr6));
+                memcpy(&addr6, evt->net.saddr_v6, sizeof(addr6));
                 if (inet_ntop(AF_INET6, &addr6, ip_str, sizeof(ip_str)) == NULL) {
                     perror("inet_ntop");
                     snprintf(ip_str, sizeof(ip_str), "InvalidIPv6");
@@ -48,13 +48,30 @@ static int handle_firewall_event(void *ctx, void *data, size_t data_sz) {
                 
             }
             
-            std::cerr << "[PACKET CONNECT_EVENT] " << (evt->net.family == AF_INET ? "AF_INET" : "AF_INET6")
+            std::cerr << "[PACKET CONNECT_EVENT_BLOCKED] " << (evt->net.family == AF_INET ? "AF_INET" : "AF_INET6")
                       << " protocol=" << (evt->net.protocol == 6 ? "TCP" : "UDP")
                       << " -> " << ip_str << ":" << evt->net.src_port << std::endl;
 
             break;
+        // case FIREWALL_EVT_BLOCKED_IP:
+        //     char ip_str2[INET6_ADDRSTRLEN];
+        //     if (evt->net.family == AF_INET) {
+        //         // IPv4
+        //         struct in_addr addr4;
+        //         addr4.s_addr = evt->net.saddr_v4;   
+        //         inet_ntop(AF_INET, &addr4, ip_str2, sizeof(ip_str2));
+        //     } else if (evt->net.family == AF_INET6) {
+        //         struct in6_addr addr6;
+        //         memcpy(&addr6, evt->net.saddr_v6, sizeof(addr6));   
+        //         if (inet_ntop(AF_INET6, &addr6, ip_str2, sizeof(ip_str2)) == NULL) {
+        //             perror("inet_ntop");
+        //             snprintf(ip_str2, sizeof(ip_str2), "InvalidIPv6");
+        //         }
+        //     } else {
+        //         snprintf(ip_str2, sizeof(ip_str2), "UnknownFamily");
+        //     }
         default:
-            std::cerr << "Unknown FIREWALL type" << std::endl;
+            // std::cerr << "Unknown FIREWALL type" << std::endl;
             break;
     }
     return 0;
@@ -94,7 +111,7 @@ int main() {
         std::cerr << "Failed to open and load BPF skeleton" << std::endl;
         goto cleanup;
     }
-
+    err_all = load_firewall_rules_into_map(skel_firewall, bpf_map__fd(skel_firewall->maps.rules_map), "firewall_configs.json");
     // Attach XDP program
     err_all = firewall_bpf__attach(skel_firewall);
     ifindex = if_nametoindex("ens33"); 
