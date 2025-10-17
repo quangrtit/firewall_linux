@@ -37,7 +37,7 @@ This project implements a custom packet filtering and firewall system using **eB
    cd firewall_linux
    cmake .. && make && sudo ./firewall_linux
 2. **Install Dependent Libraries"  
-  ```bash
+   ```bash
     sudo apt update
     sudo apt install -y \
       clang \
@@ -50,14 +50,15 @@ This project implements a custom packet filtering and firewall system using **eB
       g++ \
       bpftool \
       pkg-config
+
 3. **Run and test firewall**:
 ### add rule, remove_rule, list_rule, debug map kernel:
-  ```bash
-  cd firewall_control && cmake .. && make 
-  sudo ./firewallctl add --src_ip 203.162.10.117 --dst_ip any --src_port 443 --dst_port any --protocol TCP --action DENY
-  sudo ./firewallctl add --src_ip 203.162.10.117 --dst_ip any --src_port 443 --dst_port any --protocol TCP --action DENY
-  sudo ./firewallctl list
+   ```bash
+    cd firewall_control && cmake .. && make 
+    sudo ./firewallctl add --src_ip 203.162.10.117 --dst_ip any --src_port 443 --dst_port any --protocol TCP --action DENY
+    sudo ./firewallctl add --src_ip 203.162.10.117 --dst_ip any --src_port 443 --dst_port any --protocol TCP --action DENY
+    sudo ./firewallctl list
 
-  sudo bpftool map show
-  sudo bpftool map dump id 11
+    sudo bpftool map show
+    sudo bpftool map dump id 11
 
