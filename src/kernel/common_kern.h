@@ -45,15 +45,31 @@ struct ip_lpm_key {
     __u32 prefixlen;   // bit length: 32 for IPv4, 128 for IPv6
     __u8  data[16];    // IPv4 for 4 first byte, IPv6 for 16 byte
 };
+struct rule_key {
+    struct ip_lpm_key src;  // source
+    struct ip_lpm_key dst;  // destination
+    __u16 src_port;
+    __u16 dst_port;
+    __u8  protocol;         // IPPROTO_TCP, UDP, ICMP
+    __u8  ip_version;       // 4 or 6
+};
+// struct rule_val {
+//     __u8 action;  // 0=DROP, 1=ALLOW, 2=LOG
+// };
 enum ip_status {
     ALLOW = 0,
     DENY = 1
 };
 struct net_payload {
-    enum ip_status status;
+    // enum ip_status status;
+    __u32 status;
     __u8  family;       // AF_INET / AF_INET6
+    __u8  pad[3];
+    __u32 saddr_v4;     // IPv4 source
     __u32 daddr_v4;     // IPv4 dest
+    __u8  saddr_v6[16]; // IPv6 source
     __u8  daddr_v6[16]; // IPv6 dest
+    __u16 src_port;      // source port
     __u16 dport;        // dest port
     __u32 protocol;     // TCP/UDP
 };

@@ -50,7 +50,7 @@ static int handle_firewall_event(void *ctx, void *data, size_t data_sz) {
             
             std::cerr << "[PACKET CONNECT_EVENT] " << (evt->net.family == AF_INET ? "AF_INET" : "AF_INET6")
                       << " protocol=" << (evt->net.protocol == 6 ? "TCP" : "UDP")
-                      << " -> " << ip_str << ":" << ntohs(evt->net.dport) << std::endl;
+                      << " -> " << ip_str << ":" << evt->net.src_port << std::endl;
 
             break;
         default:
@@ -131,3 +131,4 @@ cleanup:
     }
     return 0;
 }
+//https://medium.com/@seantywork/firewall-iptables-netfilter-kernel-module-and-ebpf-xdp-b7a563711ee6

@@ -1,0 +1,18 @@
+[
+  {
+    "src_ip": "222.255.113.97",
+    "dst_ip": "any",
+    "src_port": "443",
+    "dst_port": "any",
+    "protocol": "TCP",
+    "action": "DENY"
+  },
+  {
+    "src_ip": "222.255.113.97",
+    "dst_ip": "any",
+    "src_port": "80",
+    "dst_port": "any",
+    "protocol": "TCP",
+    "action": "ALLOW"
+  }
+]
