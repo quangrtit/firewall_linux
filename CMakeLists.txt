@@ -89,6 +89,7 @@ set(USER_HEADERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/user")
 set(USER_SPACE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/user/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/user/utils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/user/connection.cpp
     # add src files here as needed
 )
 

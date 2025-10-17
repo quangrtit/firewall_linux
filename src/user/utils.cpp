@@ -6,7 +6,7 @@
 
 
 // Convert "TCP", "UDP", "ICMP" to corresponding numeric codes
-static __u8 parse_protocol(const char *proto) {
+__u8 parse_protocol(const char *proto) {
     if (!proto) return 0;
     if (strcasecmp(proto, "TCP") == 0)  return IPPROTO_TCP;
     if (strcasecmp(proto, "UDP") == 0)  return IPPROTO_UDP;
@@ -15,7 +15,7 @@ static __u8 parse_protocol(const char *proto) {
 }
 
 // Parse IP string (IPv4/IPv6/"any")
-static void parse_ip_lpm(const char *ip_str, struct ip_lpm_key *key, __u8 *ip_version) {
+void parse_ip_lpm(const char *ip_str, struct ip_lpm_key *key, __u8 *ip_version) {
     memset(key, 0, sizeof(*key));
 
     if (!ip_str || strcmp(ip_str, "any") == 0) {
@@ -197,4 +197,49 @@ std::vector<unsigned int> get_all_default_ifindexes() {
 
     freeifaddrs(ifaddr);
     return res;
+}
+
+bool append_rule_to_json(const char *filepath,
+                         const char *src_ip,
+                         const char *dst_ip,
+                         const char *src_port,
+                         const char *dst_port,
+                         const char *protocol,
+                         const char *action)
+{
+    std::ifstream in(filepath);
+    std::string content((std::istreambuf_iterator<char>(in)),
+                         std::istreambuf_iterator<char>());
+    in.close();
+
+    cJSON *root = nullptr;
+    if (content.empty()) {
+        root = cJSON_CreateArray();
+    } else {
+        root = cJSON_Parse(content.c_str());
+        if (!root || !cJSON_IsArray(root)) {
+            if (root) cJSON_Delete(root);
+            root = cJSON_CreateArray(); 
+        }
+    }
+
+    cJSON *rule = cJSON_CreateObject();
+    cJSON_AddStringToObject(rule, "src_ip", src_ip);
+    cJSON_AddStringToObject(rule, "dst_ip", dst_ip);
+    cJSON_AddStringToObject(rule, "src_port", src_port);
+    cJSON_AddStringToObject(rule, "dst_port", dst_port);
+    cJSON_AddStringToObject(rule, "protocol", protocol);
+    cJSON_AddStringToObject(rule, "action", action);
+
+    cJSON_AddItemToArray(root, rule);
+
+    char *out = cJSON_Print(root);
+    std::ofstream outFile(filepath, std::ios::trunc);
+    outFile << out;
+    outFile.close();
+
+    cJSON_Delete(root);
+    free(out);
+
+    return true;
 }

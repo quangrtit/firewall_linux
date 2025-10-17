@@ -62,7 +62,7 @@
 #define KERNEL_MKDEV(major, minor) ((__u64)(major) << KERNEL_MINORBITS | (minor))
 #define BUFFER_SIZE 1024
 #define MAX_IFACES 16
-
+#define IPC_PATH "/var/run/firewall.sock"
 enum log_level {
     INFO,
     WARNING,

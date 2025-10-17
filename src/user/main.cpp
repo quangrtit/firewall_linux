@@ -1,4 +1,5 @@
 #include "common_user.h"
+#include "connection.h"
 
 extern "C" {
     #include "firewall.skel.h"
@@ -98,6 +99,7 @@ int main() {
     pthread_t firewall_thread_id;
     struct firewall_bpf *skel_firewall = NULL;
     struct ring_buffer *rb_firewall = NULL;
+    
     int err_all; 
     std::vector<unsigned int> all_val;
     pid_t pid = getpid();         // Process ID
@@ -107,6 +109,7 @@ int main() {
     
     // Load and verify BPF program
     skel_firewall = firewall_bpf__open_and_load();
+    UnixServer server(IPC_PATH, skel_firewall, &exiting);
     if (!skel_firewall) {
         std::cerr << "Failed to open and load BPF skeleton" << std::endl;
         goto cleanup;
@@ -117,6 +120,7 @@ int main() {
     ifindex = if_nametoindex("ens33"); 
     bpf_program__attach_xdp(skel_firewall->progs.xdp_block, ifindex);
     all_val = get_all_default_ifindexes();
+    
     if(err_all) {
         std::cerr << "Failed to attach BPF program to interface ens33" << std::endl;
         goto cleanup;
@@ -135,10 +139,14 @@ int main() {
     if (pthread_create(&firewall_thread_id, NULL, firewall_thread, rb_firewall) != 0) {
         std::cerr << "Failed to create firewall thread" << std::endl;
     }
+    if (!server.start()) {
+        std::cerr << "Failed to start IPC server\n";
+    }
     while (!exiting) {
         sleep(1);
     }
     pthread_join(firewall_thread_id, NULL);
+    server.stop();
 cleanup:
     if (rb_firewall) {
         ring_buffer__free(rb_firewall);

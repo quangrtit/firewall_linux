@@ -1,0 +1,13 @@
+run firewall:
+    cmake .. && make && sudo ./firewall_linux
+run firewall_control:
+    cd firewall_control && cmake . && make && 
+    add rule: 
+        sudo ./firewallctl add --src_ip 203.162.10.117 --dst_ip any --src_port 443 --dst_port any --protocol TCP --action DENY
+    del rule: 
+        sudo ./firewallctl del --src_ip 203.162.10.117 --dst_ip any --src_port 443 --dst_port any --protocol TCP --action DENY
+    list rules:
+        sudo ./firewallctl list
+debug: 
+    sudo bpftool map show
+    sudo bpftool map dump id 11
