@@ -5,6 +5,6 @@
     "src_port": "443",
     "dst_port": "any",
     "protocol": "TCP",
-    "action": "DENY"
+    "action": "ALLOW"
   }
 ]

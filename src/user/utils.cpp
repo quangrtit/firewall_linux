@@ -34,27 +34,31 @@ void parse_ip_lpm(const char *ip_str, struct ip_lpm_key *key, __u8 *ip_version) 
         inet_pton(AF_INET, ip_str, key->data);
     }
 }
+
 int load_firewall_rules_into_map(struct firewall_bpf *skel, int map_fd, const char *json_path) {
     FILE *fp = fopen(json_path, "r");
-    if (fp == NULL) {
-        fprintf(stderr, "[user space policy_manager.cpp] Error: Could not open policy file '%s': %s\n", json_path, strerror(errno));
+    if (!fp) {
+        fprintf(stderr, "Error opening policy file '%s': %s\n", json_path, strerror(errno));
         return -1;
     }
 
     fseek(fp, 0, SEEK_END);
     long fsize = ftell(fp);
     fseek(fp, 0, SEEK_SET);
-    char *json_string = (char*)malloc(fsize + 1);
+
+    char *json_string = (char *)malloc(fsize + 1);
+    if (!json_string) {
+        fclose(fp);
+        return -1;
+    }
     fread(json_string, 1, fsize, fp);
     fclose(fp);
     json_string[fsize] = '\0';
+
     cJSON *root = cJSON_Parse(json_string);
-    if (root == NULL) {
-        const char *error_ptr = cJSON_GetErrorPtr();
-        if (error_ptr != NULL) {
-            fprintf(stderr, "[user space policy_manager.cpp] Error parsing JSON: %s\n", error_ptr);
-        }
-        free(json_string);
+    free(json_string);
+    if (!root) {
+        fprintf(stderr, "Error parsing JSON\n");
         return -1;
     }
 
@@ -63,9 +67,6 @@ int load_firewall_rules_into_map(struct firewall_bpf *skel, int map_fd, const ch
         cJSON *item = cJSON_GetArrayItem(root, i);
         if (!cJSON_IsObject(item)) continue;
 
-        struct rule_key key = {};
-        enum ip_status verdict = ALLOW;
-
         const char *src_ip   = cJSON_GetObjectItem(item, "src_ip")->valuestring;
         const char *dst_ip   = cJSON_GetObjectItem(item, "dst_ip")->valuestring;
         const char *src_port = cJSON_GetObjectItem(item, "src_port")->valuestring;
@@ -73,31 +74,117 @@ int load_firewall_rules_into_map(struct firewall_bpf *skel, int map_fd, const ch
         const char *proto    = cJSON_GetObjectItem(item, "protocol")->valuestring;
         const char *action   = cJSON_GetObjectItem(item, "action")->valuestring;
 
-        parse_ip_lpm(src_ip, &key.src, &key.ip_version);
-        parse_ip_lpm(dst_ip, &key.dst, &key.ip_version);
+        enum ip_status verdict = (strcasecmp(action, "DENY") == 0) ? DENY : ALLOW;
 
-        key.src_port = (strcmp(src_port, "any") == 0) ? 0 : (__u16)atoi(src_port);
-        key.dst_port = (strcmp(dst_port, "any") == 0) ? 0 : (__u16)atoi(dst_port);
-        key.protocol = parse_protocol(proto);
-        verdict = (strcasecmp(action, "DENY") == 0) ? DENY : ALLOW;
+        /* -------------------- Full map -------------------- */
+        struct rule_key full_key = {};
+        parse_ip_lpm(src_ip, &full_key.src, &full_key.ip_version);
+        // parse_ip_lpm(dst_ip, &full_key.dst, &full_key.ip_version);
+
+        full_key.src_port = (strcmp(src_port, "any") == 0) ? 0 : (__u16)atoi(src_port);
+        // full_key.dst_port = (strcmp(dst_port, "any") == 0) ? 0 : (__u16)atoi(dst_port);
+        full_key.protocol = parse_protocol(proto);
+        if (bpf_map__update_elem(skel->maps.rules_map, &full_key, sizeof(full_key), &verdict, sizeof(verdict), BPF_ANY) != 0) {
+            perror("Failed to insert into rules_map");
+        }
+
+        // /* -------------------- IP-only map -------------------- */
+        // if (strcmp(proto, "any") == 0 || strcmp(src_port, "any") == 0) {
+        //     struct ip_lpm_key ip_key = {};
+        //     __u8 ip_ver = 0;
+        //     parse_ip_lpm(src_ip, &ip_key, &ip_ver);
+        //     if (bpf_map__update_elem(skel->maps.rules_map_only_ip, &ip_key, sizeof(ip_key), &verdict, sizeof(verdict), BPF_ANY) != 0) {
+        //         perror("Failed to insert into rules_map_only_ip");
+        //     }
+        // }
+
+        // /* -------------------- Port-only map -------------------- */
+        // if (strcmp(src_ip, "any") == 0 ||strcmp(proto, "any") == 0) {
+        //     __u16 port = (__u16)atoi(src_port);
+        //     if (bpf_map__update_elem(skel->maps.rules_map_only_port, &port, sizeof(port), &verdict, sizeof(verdict), BPF_ANY) != 0) {
+        //         perror("Failed to insert into rules_map_only_port");
+        //     }
+        // }
+
+        // /* -------------------- Protocol-only map -------------------- */
+        // if (strcmp(src_ip, "any") == 0 && strcmp(src_port, "any") == 0) {
+        //     __u8 p = parse_protocol(proto);
+        //     if (bpf_map__update_elem(skel->maps.rules_map_only_protocol, &p, sizeof(p), &verdict, sizeof(verdict), BPF_ANY) != 0) {
+        //         perror("Failed to insert into rules_map_only_protocol");
+        //     }
+        // }
+
         printf("Loaded rule %d: %s:%s -> %s:%s (%s) = %s\n",
-                   i, src_ip, src_port, dst_ip, dst_port, proto, action);
-        if (bpf_map__update_elem(
-                skel->maps.rules_map,
-                &key, sizeof(key),
-                &verdict, sizeof(verdict),
-                BPF_ANY) != 0) {
-            perror("bpf_map__update_elem false\n");
-        }
-        else {
-            // printf("Loaded rule %d: %s:%s -> %s:%s (%s) = %s\n",
-            //        i, src_ip, src_port, dst_ip, dst_port, proto, action);
-        }
+               i, src_ip, src_port, dst_ip, dst_port, proto, action);
     }
 
     cJSON_Delete(root);
     return 0;
 }
+// int load_firewall_rules_into_map(struct firewall_bpf *skel, int map_fd, const char *json_path) {
+//     FILE *fp = fopen(json_path, "r");
+//     if (fp == NULL) {
+//         fprintf(stderr, "[user space policy_manager.cpp] Error: Could not open policy file '%s': %s\n", json_path, strerror(errno));
+//         return -1;
+//     }
+
+//     fseek(fp, 0, SEEK_END);
+//     long fsize = ftell(fp);
+//     fseek(fp, 0, SEEK_SET);
+//     char *json_string = (char*)malloc(fsize + 1);
+//     fread(json_string, 1, fsize, fp);
+//     fclose(fp);
+//     json_string[fsize] = '\0';
+//     cJSON *root = cJSON_Parse(json_string);
+//     if (root == NULL) {
+//         const char *error_ptr = cJSON_GetErrorPtr();
+//         if (error_ptr != NULL) {
+//             fprintf(stderr, "[user space policy_manager.cpp] Error parsing JSON: %s\n", error_ptr);
+//         }
+//         free(json_string);
+//         return -1;
+//     }
+
+//     int rule_count = cJSON_GetArraySize(root);
+//     for (int i = 0; i < rule_count; i++) {
+//         cJSON *item = cJSON_GetArrayItem(root, i);
+//         if (!cJSON_IsObject(item)) continue;
+
+//         struct rule_key key = {};
+//         enum ip_status verdict = ALLOW;
+
+//         const char *src_ip   = cJSON_GetObjectItem(item, "src_ip")->valuestring;
+//         const char *dst_ip   = cJSON_GetObjectItem(item, "dst_ip")->valuestring;
+//         const char *src_port = cJSON_GetObjectItem(item, "src_port")->valuestring;
+//         const char *dst_port = cJSON_GetObjectItem(item, "dst_port")->valuestring;
+//         const char *proto    = cJSON_GetObjectItem(item, "protocol")->valuestring;
+//         const char *action   = cJSON_GetObjectItem(item, "action")->valuestring;
+
+//         parse_ip_lpm(src_ip, &key.src, &key.ip_version);
+//         //parse_ip_lpm(dst_ip, &key.dst, &key.ip_version);
+
+//         key.src_port = (strcmp(src_port, "any") == 0) ? 0 : (__u16)atoi(src_port);
+//         //key.dst_port = (strcmp(dst_port, "any") == 0) ? 0 : (__u16)atoi(dst_port);
+//         key.protocol = parse_protocol(proto);
+//         verdict = (strcasecmp(action, "DENY") == 0) ? DENY : ALLOW;
+//         printf("Loaded rule %d: %s:%s -> %s:%s (%s) = %s\n",
+//                    i, src_ip, src_port, dst_ip, dst_port, proto, action);
+//         if (bpf_map__update_elem(
+//                 skel->maps.rules_map,
+//                 &key, sizeof(key),
+//                 &verdict, sizeof(verdict),
+//                 BPF_ANY) != 0) {
+//             perror("bpf_map__update_elem false\n");
+//         }
+//         else {
+//             // printf("Loaded rule %d: %s:%s -> %s:%s (%s) = %s\n",
+//             //        i, src_ip, src_port, dst_ip, dst_port, proto, action);
+//         }
+//     }
+
+//     cJSON_Delete(root);
+//     return 0;
+// }
 // Check interface IPv4
 int has_default_route4(const char *ifname) {
     FILE *f = fopen("/proc/net/route", "r");

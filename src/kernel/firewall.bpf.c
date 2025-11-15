@@ -14,11 +14,27 @@ struct {
     __uint(max_entries, 1 << 24);
 } firewall_events SEC(".maps");
 
-
 struct {
-
     __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 1024);
+    __uint(max_entries, LIMIT_IP);
+    __type(key, struct ip_lpm_key);
+    __type(value, enum ip_status);
+} rules_map_only_ip SEC(".maps");
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, LIMIT_IP);
+    __type(key, __u16);
+    __type(value, enum ip_status);
+} rules_map_only_port SEC(".maps");
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, LIMIT_IP);
+    __type(key, __u8);
+    __type(value, enum ip_status);
+} rules_map_only_protocol SEC(".maps");
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, LIMIT_IP);
     __type(key, struct rule_key);
     __type(value, enum ip_status);
 } rules_map SEC(".maps");
@@ -123,11 +139,11 @@ int xdp_block(struct xdp_md *ctx)
             struct tcphdr *th = l4;
             if ((void *)(th + 1) > data_end)
                 return XDP_PASS;
-            bpf_printk("TCP src=%u dst=%u ihl=%d tot_len=%u\n",
-                        bpf_ntohs(th->source),
-                        bpf_ntohs(th->dest),
-                        ip4->ihl,
-                        bpf_ntohs(ip4->tot_len));
+            // bpf_printk("TCP src=%u dst=%u ihl=%d tot_len=%u\n",
+            //             bpf_ntohs(th->source),
+            //             bpf_ntohs(th->dest),
+            //             ip4->ihl,
+            //             bpf_ntohs(ip4->tot_len));
             np.src_port = bpf_ntohs(th->source);
             // np.dport    = bpf_ntohs(th->dest);
         } else if (ip4->protocol == IPPROTO_UDP) {
@@ -193,8 +209,84 @@ int xdp_block(struct xdp_md *ctx)
     else {
         return XDP_PASS;
     }
-
+    // bpf_printk("debug view kernel XDP packet: family=%d protocol=%d src_port=%d\n",
+    //             np.family,
+    //             np.protocol,
+    //             np.src_port);
+    
     /* -------------------- Lookup rule -------------------- */
+    // (ip, port, protocol=any) 
+    struct rule_key full_key_1_1_0 = {};
+    __builtin_memcpy(&full_key_1_1_0, &full_key, sizeof(full_key));
+    full_key_1_1_0.protocol = 0; // any protocol
+    enum ip_status *verdict_1_1_0 = bpf_map_lookup_elem(&rules_map, &full_key_1_1_0);
+    if (verdict_1_1_0) {
+        np.status = *verdict_1_1_0;
+        if (np.status == DENY) {
+            send_event(FIREWALL_EVT_BLOCKED_IP, &np);
+            return XDP_DROP;
+        } 
+    }
+    // (ip=any, port, protocol=any)
+    
+    struct rule_key full_key_0_1_0 = {};
+    __builtin_memcpy(&full_key_0_1_0, &full_key, sizeof(full_key));
+    __builtin_memset(&full_key_0_1_0.src.data, 0, sizeof(full_key_0_1_0.src.data)); // any ip
+    full_key_0_1_0.src.prefixlen = 0;
+    full_key_0_1_0.protocol = 0; // any protocol
+    // print full_key_0_1_0 and full_key for debug
+    bpf_printk("debug full_key_0_1_0: ip_version=%d src_ip=%x src_port=%d protocol=%d\n",
+                full_key_0_1_0.ip_version,
+                *(__u32*)&full_key_0_1_0.src.data[0],
+                full_key_0_1_0.src_port,
+                full_key_0_1_0.protocol);
+    bpf_printk("debug full_key: ip_version=%d src_ip=%x src_port=%d protocol=%d\n",
+                full_key.ip_version,
+                *(__u32*)&full_key.src.data[0],
+                full_key.src_port,
+                full_key.protocol);
+    enum ip_status *verdict_0_1_0 = bpf_map_lookup_elem(&rules_map, &full_key_0_1_0);
+    send_event(FIREWALL_EVT_BLOCKED_IP, &np);
+    if (verdict_0_1_0) {
+        np.status = *verdict_0_1_0;
+        if (np.status == DENY) {
+            send_event(FIREWALL_EVT_BLOCKED_IP, &np);
+            return XDP_DROP;
+        } 
+        
+    }
+    
+    // (ip, port=any, protocol=any)
+    struct rule_key full_key_1_0_0 = {};
+    __builtin_memcpy(&full_key_1_0_0, &full_key, sizeof(full_key));
+    full_key_1_0_0.src_port = 0; // any port
+    full_key_1_0_0.protocol = 0; // any protocol
+    enum ip_status *verdict_1_0_0 = bpf_map_lookup_elem(&rules_map, &full_key_1_0_0);
+    if (verdict_1_0_0) {
+        np.status = *verdict_1_0_0;
+        if (np.status == DENY) {
+            send_event(FIREWALL_EVT_BLOCKED_IP, &np);
+            return XDP_DROP;
+        } 
+    }
+    
+    // (ip=any, port=any, protocol)
+    struct rule_key full_key_0_0_1 = {};
+    __builtin_memcpy(&full_key_0_0_1, &full_key, sizeof(full_key));
+    __builtin_memset(&full_key_0_0_1.src.data, 0, sizeof(full_key_0_0_1.src.data)); // any ip
+    full_key_0_0_1.src.prefixlen = 0;
+    full_key_0_0_1.src_port = 0; // any port
+    enum ip_status *verdict_0_0_1 = bpf_map_lookup_elem(&rules_map, &full_key_0_0_1);
+    if (verdict_0_0_1) {
+        np.status = *verdict_0_0_1;
+        if (np.status == DENY) {
+            send_event(FIREWALL_EVT_BLOCKED_IP, &np);
+            return XDP_DROP;
+        } 
+    }
+
+
+
     enum ip_status *verdict = bpf_map_lookup_elem(&rules_map, &full_key);
     if (verdict)
         np.status = *verdict;
@@ -203,7 +295,7 @@ int xdp_block(struct xdp_md *ctx)
         send_event(FIREWALL_EVT_BLOCKED_IP, &np);
         return XDP_DROP;
     } else {
-        send_event(FIREWALL_EVT_CONNECT_IP, &np);
+        // send_event(FIREWALL_EVT_CONNECT_IP, &np);
     }
 
     return XDP_PASS;

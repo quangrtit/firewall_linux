@@ -56,7 +56,7 @@ This project implements a custom packet filtering and firewall system using **eB
    ```bash
     cd firewall_control && cmake .. && make 
     sudo ./firewallctl add --src_ip 203.162.10.117 --dst_ip any --src_port 443 --dst_port any --protocol TCP --action DENY
-    sudo ./firewallctl add --src_ip 203.162.10.117 --dst_ip any --src_port 443 --dst_port any --protocol TCP --action DENY
+    sudo ./firewallctl del --src_ip 203.162.10.117 --dst_ip any --src_port 443 --dst_port any --protocol TCP --action DENY
     sudo ./firewallctl list
 
     sudo bpftool map show

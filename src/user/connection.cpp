@@ -131,10 +131,10 @@ void UnixServer::handleClient(int client_fd) {
 
         struct rule_key key {};
         parse_ip_lpm(src_ip, &key.src, &key.ip_version);
-        parse_ip_lpm(dst_ip, &key.dst, &key.ip_version);
+        // parse_ip_lpm(dst_ip, &key.dst, &key.ip_version);
 
         key.src_port = (strcmp(src_port, "any") == 0) ? 0 : (__u16)atoi(src_port);
-        key.dst_port = (strcmp(dst_port, "any") == 0) ? 0 : (__u16)atoi(dst_port);
+        // key.dst_port = (strcmp(dst_port, "any") == 0) ? 0 : (__u16)atoi(dst_port);
         key.protocol = parse_protocol(protocol);
 
         enum ip_status verdict = (strcasecmp(action, "ALLOW") == 0) ? ALLOW : DENY;
@@ -150,10 +150,24 @@ void UnixServer::handleClient(int client_fd) {
                 BPF_ANY) != 0) {
             perror("bpf_map__update_elem false\n");
         }
-        else {
-            std::cerr << "updated BPF map rule\n";
-        }
-
+        // if (strcmp(protocol, "any") == 0 && strcmp(src_port, "any") == 0) {
+        //     bpf_map__update_elem(skel_->maps.rules_map_only_ip,
+        //                         &key.src, sizeof(key.src), &verdict, sizeof(verdict), BPF_ANY);
+        //     // bpf_map__update_elem(skel_->maps.rules_map_only_ip,
+        //     //                     &key.dst, sizeof(key.dst), &verdict, sizeof(verdict), BPF_ANY);
+        // }
+        // if (strcmp(src_ip, "any") == 0 && strcmp(protocol, "any") == 0) {    
+        //     bpf_map__update_elem(skel_->maps.rules_map_only_port,
+        //                         &key.src_port, sizeof(key.src_port), &verdict, sizeof(verdict), BPF_ANY);
+        // }
+        // // if (key.dst_port != 0) {
+        // //     bpf_map__update_elem(skel_->maps.rules_map_only_port,
+        // //                     &key.dst_port, sizeof(key.dst_port), &verdict, sizeof(verdict), BPF_ANY);
+        // // }
+        // if (strcmp(src_ip, "any") == 0 && strcmp(src_port, "any") == 0) {
+        //     bpf_map__update_elem(skel_->maps.rules_map_only_protocol,
+        //                         &key.protocol, sizeof(key.protocol), &verdict, sizeof(verdict), BPF_ANY);
+        // }
         std::string ok = "{\"status\":\"ok\"}";
         write(client_fd, ok.c_str(), ok.size());
     }
@@ -174,10 +188,10 @@ void UnixServer::handleClient(int client_fd) {
 
         struct rule_key key {};
         parse_ip_lpm(src_ip, &key.src, &key.ip_version);
-        parse_ip_lpm(dst_ip, &key.dst, &key.ip_version);
+        // parse_ip_lpm(dst_ip, &key.dst, &key.ip_version);
 
         key.src_port = (strcmp(src_port, "any") == 0) ? 0 : (__u16)atoi(src_port);
-        key.dst_port = (strcmp(dst_port, "any") == 0) ? 0 : (__u16)atoi(dst_port);
+        // key.dst_port = (strcmp(dst_port, "any") == 0) ? 0 : (__u16)atoi(dst_port);
         key.protocol = parse_protocol(protocol);
 
         if (bpf_map__delete_elem(
@@ -185,9 +199,25 @@ void UnixServer::handleClient(int client_fd) {
                 &key, sizeof(key), 0) != 0) {
             perror("bpf_map__delete_elem false\n");
         }
-        else {
-            std::cerr << "removed BPF map rule\n";
-        }
+        // if (strcmp(protocol, "any") == 0 || strcmp(src_port, "any") == 0) {
+        //     bpf_map__delete_elem(skel_->maps.rules_map_only_ip, &key.src, sizeof(key.src), 0);
+        // }
+
+        // // if (strcmp(dst_ip, "any") != 0) {
+        // //     bpf_map__delete_elem(skel_->maps.rules_map_only_ip, &key.dst, sizeof(key.dst), 0);
+        // // }
+
+        // if (strcmp(src_ip, "any") == 0 ||strcmp(protocol, "any") == 0) {
+        //     bpf_map__delete_elem(skel_->maps.rules_map_only_port, &key.src_port, sizeof(key.src_port), 0);
+        // }
+
+        // // if (key.dst_port != 0) {
+        // //     bpf_map__delete_elem(skel_->maps.rules_map_only_port, &key.dst_port, sizeof(key.dst_port), 0);
+        // // }
+
+        // if (strcmp(src_ip, "any") == 0 || strcmp(src_port, "any") == 0) {
+        //     bpf_map__delete_elem(skel_->maps.rules_map_only_protocol, &key.protocol, sizeof(key.protocol), 0);
+        // }
 
         std::string ok = "{\"status\":\"ok\"}";
         write(client_fd, ok.c_str(), ok.size());

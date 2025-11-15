@@ -55,7 +55,10 @@
 #define MAX_PATH_LEN 128
 #define MAX_POLICY_ENTRIES 64
 #define NAME_MAX 255
+#define ANY_PORT        0      /* port == 0  => match any port */
+#define ANY_PROTOCOL    0      /* proto == 0 => match any protocol */
 #define EPERM     1
+#define LIMIT_IP 1024
 #define __u64 long long unsigned int
 #define __s64 int64_t
 #define KERNEL_MINORBITS 20
@@ -82,15 +85,15 @@ enum firewall_event_type {
     FIREWALL_EVT_BLOCKED_IP
 };
 struct ip_lpm_key {
-    __u32 prefixlen;   // bit length: 32 for IPv4, 128 for IPv6
+    __u32 prefixlen;   // bit length: 32 for IPv4, 128 for IPv6 and /* bit length: 0 => ANY, 32 => /32 IPv4, 128 => /128 IPv6 */
     __u8  data[16];    // IPv4 for 4 first byte, IPv6 for 16 byte
 };
 struct rule_key {
     struct ip_lpm_key src;  // source
     struct ip_lpm_key dst;  // destination
-    __u16 src_port;
-    __u16 dst_port;
-    __u8  protocol;         // IPPROTO_TCP, UDP, ICMP
+    __u16 src_port; /* 0 == ANY */
+    __u16 dst_port; /* 0 == ANY */
+    __u8  protocol;         // IPPROTO_TCP, UDP, ICMP and /* 0 == ANY, otherwise IPPROTO_* */
     __u8  ip_version;       // 4 or 6
 };
 enum ip_status {
